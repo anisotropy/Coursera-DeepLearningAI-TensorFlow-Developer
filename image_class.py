@@ -79,6 +79,8 @@ def image_generators_dir(dir_train, dir_valid, target_size, class_mode, rescale,
 
 
 def model_with_inception_v3(weights_path, input_shape, last_layer_name, successive_layers):
+    # wights_url = 'https://storage.googleapis.com/mledu-datasets/inception_v3_weights_tf_dim_ordering_tf_kernels_notop.h5'
+    # last_layer_name = 'mixed7'
     pretrained_model = InceptionV3(input_shape=input_shape, include_top=False, weights=None)
     pretrained_model.load_weights(weights_path)
     for layer in pretrained_model.layers:
