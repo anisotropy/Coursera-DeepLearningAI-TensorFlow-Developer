@@ -18,14 +18,13 @@ def reshape_1d(values_1d, shape):
     return np.array(values_1d, dtype='float32').reshape(shape)
 
 
-def data_from_mnist(name='mnist'):
-    mnist = tf.keras.datasets[name]
+def data_from_mnist(mnist, rescale):
     (images_train, labels_train), (images_valid, labels_valid) = mnist.load_data()
 
-    x_train = np.expand_dims(images_train, axis=-1) / 255
+    x_train = np.expand_dims(images_train, axis=-1) * rescale
     y_train = labels_train
 
-    x_valid = np.expand_dims(images_valid, axis=-1) / 255
+    x_valid = np.expand_dims(images_valid, axis=-1) * rescale
     y_valid = labels_valid
 
     num_class = len(np.unique(x_train))
@@ -35,9 +34,9 @@ def data_from_mnist(name='mnist'):
     return x_train, y_train, x_valid, y_valid, num_class, image_shape
 
 
-def image_generators(x_train, y_train, x_valid, y_valid, batch_size):
+def image_generators(x_train, y_train, x_valid, y_valid, rescale, batch_size):
     datagen_train = ImageDataGenerator(
-        rescale=1/255,
+        rescale=rescale,
         width_shift_range=0.2,
         height_shift_range=0.2,
         rotation_range=40,
@@ -45,17 +44,17 @@ def image_generators(x_train, y_train, x_valid, y_valid, batch_size):
         zoom_range=0.2,
         horizontal_flip=True
     )
-    gen_train = datagen_train.flow(x_train, y_train, batch_size=batch_size)
+    gen_train = datagen_train.flow(x_train, y_train, batch_size=batch_size, shuffle=True)
 
-    datagen_valid = ImageDataGenerator(rescale=1/255)
-    gen_valid = datagen_valid.flow(x_valid, y_valid, batch_size=batch_size)
+    datagen_valid = ImageDataGenerator(rescale=rescale)
+    gen_valid = datagen_valid.flow(x_valid, y_valid, batch_size=batch_size, shuffle=True)
 
     return gen_train, gen_valid
 
 
-def image_generators_dir(dir_train, dir_valid, target_size, class_mode, batch_size):
+def image_generators_dir(dir_train, dir_valid, target_size, class_mode, rescale, batch_size):
     datagen_train = ImageDataGenerator(
-        rescale=1/255,
+        rescale=rescale,
         width_shift_range=0.2,
         height_shift_range=0.2,
         shear_range=0.2,
@@ -65,13 +64,15 @@ def image_generators_dir(dir_train, dir_valid, target_size, class_mode, batch_si
     )
     gen_train = datagen_train.flow_from_directory(
         dir_train,
-        target_size=target_size, class_mode=class_mode, batch_size=batch_size
+        target_size=target_size, class_mode=class_mode, batch_size=batch_size,
+        shuffle=True
     )
 
-    datagen_valid = ImageDataGenerator(rescale=1/255)
+    datagen_valid = ImageDataGenerator(rescale=rescale)
     gen_valid = datagen_valid.flow_from_directory(
         dir_valid,
-        target_size=target_size, class_mode=class_mode, batch_size=batch_size
+        target_size=target_size, class_mode=class_mode, batch_size=batch_size,
+        shuffle=True
     )
 
     return gen_train, gen_valid
@@ -106,7 +107,7 @@ def layers_1():
 
 def layers_2():
     return [
-        layers.Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
+        layers.Conv2D(32, (3, 3), activation='relu'),
         layers.MaxPooling2D((2, 2)),
         layers.Conv2D(64, (3, 3), activation='relu'),
         layers.MaxPooling2D((2, 2)),
