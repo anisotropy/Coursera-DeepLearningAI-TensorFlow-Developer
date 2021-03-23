@@ -13,7 +13,7 @@ def windowed_dataset(train_series, window_size, shuffle_buffer_size, batch_size)
     return ds
 
 
-def layers_1():
+def layers_0():
     return [
         layers.Conv1D(32, 5, padding='causal', activation='relu'),
         layers.Bidirectional(layers.LSTM(64, return_sequences=True)),
