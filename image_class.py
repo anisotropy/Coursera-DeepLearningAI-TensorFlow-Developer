@@ -93,6 +93,22 @@ def model_with_inception_v3(weights_path, input_shape, last_layer_name, successi
     return tf.keras.Model(pretrained_model.input, output)
 
 
+def layers_0():
+    return [
+        layers.Conv2D(16, (3, 3), activation='relu', ),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Conv2D(32, (3, 3), activation='relu'),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Conv2D(64, (3, 3), activation='relu'),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Conv2D(64, (3, 3), activation='relu'),
+        layers.MaxPooling2D(pool_size=(2, 2)),
+        layers.Flatten(),
+        layers.Dense(1024, activation='relu'),
+        layers.Dropout(0.2),
+    ]
+
+
 def layers_1():
     return [
         layers.Conv2D(16, (3, 3), activation='relu',),
