@@ -13,6 +13,21 @@ def clear_session():
     np.random.seed(51)
 
 
+def fetch_from_url(url, filepath):
+    tf.keras.utils.get_file(os.path.abspath(filepath), origin=url)
+
+
+def flat_histories(histories):
+    history = {}
+    for h in histories:
+        for metric, values in h.items():
+            if not history.get(metric):
+                history[metric] = []
+            for value in values:
+                history[metric].append(value)
+    return history
+
+
 def plot_history(history, metrics=('loss',)):
     mpplot.figure(figsize=(10, 6))
     epochs = range(len(history[metrics[0]]))
@@ -49,17 +64,6 @@ def load_histories(filepath):
         return json.load(file)
 
 
-def flat_histories(histories):
-    history = {}
-    for h in histories:
-        for metric, values in h.items():
-            if not history.get(metric):
-                history[metric] = []
-            for value in values:
-                history[metric].append(value)
-    return history
-
-
 def remove_stopwords(text, stopwords):
     words_without_stopwords = []
     for word in text.split():
@@ -88,10 +92,6 @@ def seasonality(time, period, amplitude=1, phase=0):
 def noise(time, noise_level=1, seed=None):
     rnd = np.random.RandomState(seed)
     return rnd.randn(len(time)) * noise_level
-
-
-def fetch_from_url(url, filepath):
-    tf.keras.utils.get_file(os.path.abspath(filepath), origin=url)
 
 
 def shuffle(seq):
