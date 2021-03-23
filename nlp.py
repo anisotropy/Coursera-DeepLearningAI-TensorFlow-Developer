@@ -101,6 +101,18 @@ def pretrained_embedding_layer(num_words, embedding_dim, embedding_matrix):
     )
 
 
+def layers_0(num_words, embedding_dim):
+    return [
+        layers.Embedding(num_words, embedding_dim),
+        layers.Conv1D(64, 5, activation='relu'),
+        layers.MaxPooling1D(4),
+        layers.Bidirectional(layers.LSTM(32, return_sequences=True)),
+        layers.Bidirectional(layers.LSTM(32)),
+        layers.Dense(num_words / 2, activation='relu'),
+        layers.Dropout(0.5),
+    ]
+
+
 def layers_1(num_words, embedding_dim):
     return [
         layers.Embedding(num_words, embedding_dim),
@@ -188,4 +200,3 @@ def predict_next_words(model, tokenizer, sequence_length, seed_text, num_next_wo
             new_text += ' ' + next_word
 
     return new_text
-  
