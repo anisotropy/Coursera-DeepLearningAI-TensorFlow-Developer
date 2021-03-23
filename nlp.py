@@ -39,11 +39,12 @@ def padded_batch_ds(raw_ds, batch_size, shuffle_buffer_size=None):
     return ds
 
 
-def texts_to_sequences(texts, max_length, oov_token=None):
+def texts_to_sequences(texts, max_length, tokenizer=None, oov_token=None):
     padding = 'post'
     truncating = 'post'
-    tokenizer = Tokenizer(oov_token=oov_token)
-    tokenizer.fit_on_texts(texts)
+    if tokenizer is None:
+        tokenizer = Tokenizer(oov_token=oov_token)
+        tokenizer.fit_on_texts(texts)
     num_words = len(tokenizer.word_index) + 1
 
     seqs = tokenizer.texts_to_sequences(texts)
