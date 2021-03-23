@@ -65,7 +65,7 @@ def texts_to_n_gram_sequences(texts, oov_token=None):
         seq_len = len(seq)
         max_length = (lambda x: x if x > max_length else max_length)(seq_len)
         for i in range(1, seq_len):
-            input_seqs.append(seq[:i + 1])
+            input_seqs.append(seq[:i+1])
 
     padded_seqs = pad_sequences(input_seqs, maxlen=max_length)
 
