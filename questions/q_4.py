@@ -1,6 +1,4 @@
-# !wget --no-check-certificate \
-#     https://storage.googleapis.com/mledu-datasets/cats_and_dogs_filtered.zip \
-#     -O /tmp/cats_and_dogs_filtered.zip
+# cats_and_dogs_filtered
 
 
 import tensorflow as tf
@@ -12,19 +10,51 @@ import numpy as np
 import matplotlib.pyplot as mpplot
 
 
-# Get Data
-dir_train = '/tmp/cats_and_dogs_filtered/train'
-dir_valid = '/tmp/cats_and_dogs_filtered/validation'
-
-def load_image(directory=None, nth=0, path=None, target_size=None):
-    if path is None:
-        image_path = os.path.join(directory, os.listdir(directory)[0])
-    else:
-        image_path = path
-    return load_img(image_path, target_size=target_size)
+def clear_session():
+    tf.keras.backend.clear_session()
+    tf.random.set_seed(51)
+    np.random.seed(51)
 
 
-print(load_image(dir_train + '/cats', 0))
+def flat_histories(histories):
+    history = {}
+    for h in histories:
+        for metric, values in h.items():
+            if not history.get(metric):
+                history[metric] = []
+            for value in values:
+                history[metric].append(value)
+    return history
+
+
+def plot_history(history, metrics=('loss',)):
+    mpplot.figure(figsize=(10, 6))
+    epochs = range(len(history[metrics[0]]))
+    for metric in metrics:
+        mpplot.plot(epochs, history[metric], label=metric)
+    mpplot.legend()
+
+
+def plot(ys, labels=None):
+    mpplot.figure(figsize=(10, 6))
+    x = range(len(ys[0]))
+    for i in range(len(ys)):
+        if labels is not None and len(labels) == len(ys):
+            label = labels[i]
+        else:
+            label = None
+        mpplot.plot(x, ys[i], label=label)
+    mpplot.legend()
+
+
+def callback_of_stop_training(condition, message='Cancel training...'):
+    class StopTraining(tf.keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            if condition(logs):
+                print('\n{}'.format(message))
+                self.model.stop_training = True
+
+    return StopTraining()
 
 
 # Prepare Data
@@ -54,82 +84,60 @@ def image_generators_dir(dir_train, dir_valid, target_size, class_mode, rescale,
     return gen_train, gen_valid
 
 
-target_size = (300, 300)
+dir_train = 'tmp/cats_and_dogs_filtered/train'
+dir_valid = 'tmp/cats_and_dogs_filtered/validation'
+target_size = (150, 150)
+input_shape = (*target_size, 3)
 
 gen_train, gen_valid = image_generators_dir(
-    dir_train, dir_valid, target_size, class_mode='binary', rescale=1/255, batch_size=32
+    dir_train, dir_valid, target_size,
+    class_mode='binary', rescale=1/255, batch_size=32
 )
 
 
 # Model
-model = tf.keras.models.Sequential([
-    Input(shape=(300, 300, 3)),
-    layers.Conv2D(16, (3, 3), activation='relu',),
-    layers.MaxPooling2D(pool_size=(2, 2)),
-    layers.Conv2D(32, (3, 3), activation='relu'),
-    layers.MaxPooling2D(pool_size=(2, 2)),
-    layers.Conv2D(64, (3, 3), activation='relu'),
-    layers.MaxPooling2D(pool_size=(2, 2)),
-    layers.Conv2D(64, (3, 3), activation='relu'),
-    layers.MaxPooling2D(pool_size=(2, 2)),
+def model_with_inception_v3(input_shape, successive_layers):
+    wights_url = 'https://storage.googleapis.com/mledu-datasets/inception_v3_weights_tf_dim_ordering_tf_kernels_notop.h5'
+    weights_path = 'tmp/inception_weights.h5'
+    last_layer_name = 'mixed7'
+
+    tf.keras.utils.get_file(os.path.abspath(weights_path), origin=wights_url)
+
+    pretrained_model = InceptionV3(input_shape=input_shape, include_top=False, weights=None)
+    pretrained_model.load_weights(weights_path)
+    for layer in pretrained_model.layers:
+        layer.trainable = False
+    output = pretrained_model.get_layer(last_layer_name).output
+
+    for layer in successive_layers:
+        output = layer(output)
+
+    return tf.keras.Model(pretrained_model.input, output)
+
+
+model = model_with_inception_v3(input_shape, [
     layers.Flatten(),
-    layers.Dense(1024, activation='relu'),
-    layers.Dropout(0.2),
+    layers.Dense(32, activation='relu'),
     layers.Dense(1, activation='sigmoid')
 ])
-
-model.compile(
-    optimizer='adam',
-    loss='binary_crossentropy',
-    metrics=['acc']
-)
-
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
 histories = []
 
 
 # Train
-def callback_of_stop_training(condition, message='Cancel training...'):
-    class StopTraining(tf.keras.callbacks.Callback):
-        def on_epoch_end(self, epoch, logs=None):
-            if condition(logs):
-                print('\n{}'.format(message))
-                self.model.stop_training = True
-
-    return StopTraining()
-
-stop_training = callback_of_stop_training(
-    lambda logs: logs.get('acc') > 0.8 and logs.get('val_acc') > 0.8
-)
-
-history = model.fit(
-    gen_train, validation_data=gen_valid, epochs=40, callbacks=[stop_training]
-)
-
+epochs = 5
+stop_training = callback_of_stop_training(lambda logs: logs.get('acc') > 0.9 and logs.get('val_acc') > 0.9)
+history = model.fit(gen_train, validation_data=gen_valid, epochs=epochs, callbacks=[stop_training])
 histories.append(history.history)
+plot_history(history.history, ('acc', 'val_acc'))
 
 
 # History
-def flat_histories(histories):
-    history = {}
-    for h in histories:
-        for metric, values in h.items():
-            if not history.get(metric):
-                history[metric] = []
-            for value in values:
-                history[metric].append(value)
-    return history
+saved_history = flat_histories(histories)
+plot_history(saved_history, ('acc', 'val_acc'))
 
-
-def plot_history(history, metrics=('loss',)):
-    mpplot.figure(figsize=(10, 6))
-    epochs = range(len(history[metrics[0]]))
-    for metric in metrics:
-        mpplot.plot(epochs, history[metric], label=metric)
-    mpplot.legend()
-
-
-my_history = flat_histories(histories)
-plot_history(my_history, ('acc', 'val_acc'))
+plot([saved_history['acc'][:epochs], history.history['acc']], ['old', 'new'])
+plot([saved_history['val_acc'][:epochs], history.history['val_acc']], ['old', 'new'])
 
 
 # Save Model
