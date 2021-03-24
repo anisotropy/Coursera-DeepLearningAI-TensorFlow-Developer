@@ -34,6 +34,18 @@ def plot_history(history, metrics=('loss',)):
     for metric in metrics:
         mpplot.plot(epochs, history[metric], label=metric)
     mpplot.legend()
+    
+    
+def plot(ys, labels=None):
+    mpplot.figure(figsize=(10, 6))
+    x = range(len(ys[0]))
+    for i in range(len(ys)):
+        if labels is not None and len(labels) == len(ys):
+            label = labels[i]
+        else:
+            label = None
+        mpplot.plot(x, ys[i], label=label)
+    mpplot.legend()
 
 
 def callback_of_stop_training(condition, message='Cancel training...'):
