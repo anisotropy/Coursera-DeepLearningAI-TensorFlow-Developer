@@ -1,5 +1,6 @@
 # sarcasm.json
 
+
 import tensorflow as tf
 from tensorflow.keras import layers, Input, regularizers
 from tensorflow.keras.preprocessing.text import Tokenizer
@@ -8,56 +9,46 @@ import tensorflow_datasets as tfds
 import numpy as np
 import matplotlib.pyplot as mpplot
 import json
+import random
 
 
-# Get Data
-texts = []
-labels = []
-with open('/tmp/sarcasm.json', 'r') as file:
-    for d in json.load(file):
-        texts.append(d['headline'])
-        labels.append(d['is_sarcastic'])
+def clear_session():
+    tf.keras.backend.clear_session()
+    tf.random.set_seed(51)
+    np.random.seed(51)
 
 
-# Prepare Data
-def texts_to_sequences(texts, max_length, oov_token=None):
-    padding = 'post'
-    truncating = 'post'
-    tokenizer = Tokenizer(oov_token=oov_token)
-    tokenizer.fit_on_texts(texts)
-    num_words = len(tokenizer.word_index) + 1
-
-    seqs = tokenizer.texts_to_sequences(texts)
-    padded_seqs = pad_sequences(seqs, maxlen=max_length, padding=padding, truncating=truncating)
-
-    return padded_seqs, num_words, tokenizer
-
-max_length = 200
-padded_seqs, num_words, tokenizer = texts_to_sequences(texts, max_length)
-
-x_data = padded_seqs
-y_data = np.array(labels)
+def flat_histories(histories):
+    history = {}
+    for h in histories:
+        for metric, values in h.items():
+            if not history.get(metric):
+                history[metric] = []
+            for value in values:
+                history[metric].append(value)
+    return history
 
 
-# Model
-embedding_dim = 32
-model = tf.keras.models.Sequential([
-    Input(shape=(max_length,)),
-    layers.Embedding(num_words, embedding_dim),
-    layers.Conv1D(64, 5, activation='relu'),
-    layers.MaxPooling1D(4),
-    layers.Bidirectional(layers.LSTM(32, return_sequences=True)),
-    layers.Bidirectional(layers.LSTM(32)),
-    layers.Dense(num_words / 2, activation='relu'),
-    layers.Dropout(0.5),
-    layers.Dense(1, activation='sigmoid'),
-])
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
-
-histories = []
+def plot_history(history, metrics=('loss',)):
+    mpplot.figure(figsize=(10, 6))
+    epochs = range(len(history[metrics[0]]))
+    for metric in metrics:
+        mpplot.plot(epochs, history[metric], label=metric)
+    mpplot.legend()
 
 
-# Train
+def plot(ys, labels=None):
+    mpplot.figure(figsize=(10, 6))
+    x = range(len(ys[0]))
+    for i in range(len(ys)):
+        if labels is not None and len(labels) == len(ys):
+            label = labels[i]
+        else:
+            label = None
+        mpplot.plot(x, ys[i], label=label)
+    mpplot.legend()
+
+
 def callback_of_stop_training(condition, message='Cancel training...'):
     class StopTraining(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
@@ -68,26 +59,77 @@ def callback_of_stop_training(condition, message='Cancel training...'):
     return StopTraining()
 
 
-stop_training = callback_of_stop_training(
-    lambda logs: logs.get('acc') > 0.9 and logs.get('val_acc') > 0.9
+# Get Data
+with open('tmp/sarcasm.json', 'r') as file:
+    data = json.load(file)
+
+
+# Prepare Data
+def texts_to_sequences(texts, max_length, tokenizer=None, oov_token=None):
+    padding = 'post'
+    truncating = 'post'
+    if tokenizer is None:
+        tokenizer = Tokenizer(oov_token=oov_token)
+        tokenizer.fit_on_texts(texts)
+    num_words = len(tokenizer.word_index) + 1
+
+    seqs = tokenizer.texts_to_sequences(texts)
+    padded_seqs = pad_sequences(seqs, maxlen=max_length, padding=padding, truncating=truncating)
+
+    return padded_seqs, num_words, tokenizer
+
+
+x_data, y_data = [], []
+for d in data:
+    x_data.append(d['headline'])
+    y_data.append(d['is_sarcastic'])
+
+split_size = int(len(x_data) * 0.8)
+max_length = 15
+
+x_train, num_words, tokenizer = texts_to_sequences(x_data[:split_size], max_length)
+x_valid, _, _ = texts_to_sequences(x_data[split_size:], max_length, tokenizer)
+y_train = np.array(y_data[:split_size])
+y_valid = np.array(y_data[split_size:])
+
+
+# Model
+embedding_dim = 32
+model = tf.keras.models.Sequential([
+    Input(shape=(max_length,)),
+    layers.Embedding(num_words, embedding_dim),
+    # layers.Conv1D(64, 5, activation='relu'),
+    # layers.MaxPooling1D(4),
+    # layers.Bidirectional(layers.LSTM(32, return_sequences=True)),
+    layers.Bidirectional(layers.LSTM(32)),
+    # layers.Dense(num_words / 2, activation='relu'),
+    # layers.Dropout(0.5),
+    layers.Dense(1, activation='sigmoid')
+])
+model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc'])
+histories = []
+
+
+# Train
+stop_training = callback_of_stop_training(lambda logs: logs.get('acc') > 0.9 and logs.get('val_acc') > 0.9)
+history = model.fit(
+    x_train, y_train, validation_data=(x_valid, y_valid),
+    shuffle=True, epochs=10, callbacks=[stop_training]
 )
-
-history = model.fit(x_data, y_data, epochs=10, shuffle=True, validation_split=0.2, callbacks=[stop_training])
-
 histories.append(history.history)
+plot_history(history.history, ('acc', 'val_acc'))
 
 
 # History
-def plot_history(history, metrics=('loss',)):
-    mpplot.figure(figsize=(10, 6))
-    epochs = range(len(history[metrics[0]]))
-    for metric in metrics:
-        mpplot.plot(epochs, history[metric], label=metric)
-    mpplot.legend()
+saved_history = flat_histories(histories)
+plot_history(saved_history, ('acc', 'val_acc'))
 
-
-plot_history(history.history, ('acc', 'val_acc'))
+plot([saved_history['val_acc'][:10], history.history['val_acc']], ['old', 'new'])
 
 
 # Save Model
 model.save('model_q9_1.h5')
+
+
+
+

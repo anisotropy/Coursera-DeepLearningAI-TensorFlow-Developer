@@ -1,9 +1,10 @@
 import tensorflow as tf
-from tensorflow.keras import layers, regularizers
+from tensorflow.keras import layers, Input, regularizers
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow_datasets as tfds
 import numpy as np
+import matplotlib.pyplot as mpplot
 
 
 def load_imdb():
@@ -201,3 +202,11 @@ def predict_next_words(model, tokenizer, sequence_length, seed_text, num_next_wo
             new_text += ' ' + next_word
 
     return new_text
+
+
+def plot_forecast(series_valid, forecast):
+    mpplot.figure(figsize=(10, 6))
+    time = range(len(forecast))
+    mpplot.plot(time, series_valid, label='true')
+    mpplot.plot(time, forecast, label='forecast')
+    mpplot.legend()

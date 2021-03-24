@@ -142,3 +142,10 @@ plot([saved_history['val_acc'][:epochs], history.history['val_acc']], ['old', 'n
 
 # Save Model
 model.save('model_q4_1.h5')
+
+
+
+
+
+
+

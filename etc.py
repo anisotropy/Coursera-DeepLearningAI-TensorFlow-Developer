@@ -34,8 +34,8 @@ def plot_history(history, metrics=('loss',)):
     for metric in metrics:
         mpplot.plot(epochs, history[metric], label=metric)
     mpplot.legend()
-    
-    
+
+
 def plot(ys, labels=None):
     mpplot.figure(figsize=(10, 6))
     x = range(len(ys[0]))

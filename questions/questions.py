@@ -11,7 +11,6 @@
 # horse-or-human
 # train_url = "https://storage.googleapis.com/laurencemoroney-blog.appspot.com/horse-or-human.zip"
 # validation_url = 'https://storage.googleapis.com/laurencemoroney-blog.appspot.com/validation-horse-or-human.zip'
-
 #
 # 4. 2-1
 # cats_and_dogs_filtered

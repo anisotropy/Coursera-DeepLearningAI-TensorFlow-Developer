@@ -1,14 +1,20 @@
-# https://storage.googleapis.com/laurencemoroney-blog.appspot.com/sonnets.txt
-# seed_text = "Help me Obi Wan Kenobi, you're my only hope"
+# sonnets.txt
 
 
+import csv
+import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers, Input, regularizers
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import tensorflow_datasets as tfds
-import numpy as np
 import matplotlib.pyplot as mpplot
+
+
+def clear_session():
+    tf.keras.backend.clear_session()
+    tf.random.set_seed(51)
+    np.random.seed(51)
 
 
 def flat_histories(histories):
@@ -30,6 +36,18 @@ def plot_history(history, metrics=('loss',)):
     mpplot.legend()
 
 
+def plot(ys, labels=None):
+    mpplot.figure(figsize=(10, 6))
+    x = range(len(ys[0]))
+    for i in range(len(ys)):
+        if labels is not None and len(labels) == len(ys):
+            label = labels[i]
+        else:
+            label = None
+        mpplot.plot(x, ys[i], label=label)
+    mpplot.legend()
+
+
 def callback_of_stop_training(condition, message='Cancel training...'):
     class StopTraining(tf.keras.callbacks.Callback):
         def on_epoch_end(self, epoch, logs=None):
@@ -38,11 +56,6 @@ def callback_of_stop_training(condition, message='Cancel training...'):
                 self.model.stop_training = True
 
     return StopTraining()
-
-
-stop_training = callback_of_stop_training(
-    lambda logs: logs.get('acc') > 0.85
-)
 
 
 # Get Data
@@ -77,31 +90,12 @@ def texts_to_n_gram_sequences(texts, oov_token=None):
     return x_train, y_train, num_words, sequence_length, tokenizer
 
 
-x_train, y_train, num_words, sequence_length, tokenizer = texts_to_n_gram_sequences(texts)
-
-
-# Model - saved
-embedding_dim = 100
-model = tf.keras.models.Sequential([
-    Input(shape=(sequence_length,)),
-    layers.Embedding(num_words, embedding_dim),
-    # layers.Conv1D(64, 5, activation='relu'),
-    # layers.MaxPooling1D(4),
-    # layers.Bidirectional(layers.LSTM(32, return_sequences=True)),
-    layers.Bidirectional(layers.LSTM(32)),
-    # layers.Dense(num_words / 2, activation='relu'),
-    # layers.Dropout(0.5),
-    layers.Dense(num_words, activation='softmax')
-])
-model.compile(
-    optimizer='adam',
-    loss='categorical_crossentropy',
-    metrics=['acc']
-)
-histories = []
+x_data, y_data, num_words, sequence_length, tokenizer = texts_to_n_gram_sequences(texts)
 
 
 # Model
+clear_session()
+
 embedding_dim = 100
 model = tf.keras.models.Sequential([
     Input(shape=(sequence_length,)),
@@ -110,53 +104,50 @@ model = tf.keras.models.Sequential([
     # layers.MaxPooling1D(4),
     # layers.Bidirectional(layers.LSTM(32, return_sequences=True)),
     layers.Bidirectional(layers.LSTM(32)),
-    # layers.Dense(32, activation='relu'),
-    # layers.Dropout(0.5),
+    layers.Dense(32, activation='relu'),
+    layers.Dropout(0.5),
     layers.Dense(num_words, activation='softmax')
 ])
-model.compile(
-    optimizer='adam',
-    loss='categorical_crossentropy',
-    metrics=['acc']
-)
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['acc'])
+histories = []
+
+
+# Model -- new
+clear_session()
+
+embedding_dim = 100
+model = tf.keras.models.Sequential([
+    Input(shape=(sequence_length,)),
+    layers.Embedding(num_words, embedding_dim),
+    # layers.Conv1D(64, 5, activation='relu'),
+    # layers.MaxPooling1D(4),
+    # layers.Bidirectional(layers.LSTM(32, return_sequences=True)),
+    layers.Bidirectional(layers.LSTM(32)),
+    layers.Dense(1024, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(num_words, activation='softmax')
+])
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['acc'])
 histories = []
 
 
 # Train
-history = model.fit(x_train, y_train, epochs=50, callbacks=[stop_training])
+epoch_unit = 60
+stop_training = callback_of_stop_training(lambda logs: logs.get('acc') > 0.8 and logs.get('val_acc') > 0.8)
+history = model.fit(
+    x_data, y_data, validation_split=0.2, shuffle=True,
+    epochs=epoch_unit, callbacks=[stop_training]
+)
 histories.append(history.history)
-
+plot_history(history.history, ('acc', 'val_acc'))
 
 # History
-my_history = flat_histories(histories)
-plot_history(my_history, ('acc',))
+saved_history = flat_histories(histories)
+plot_history(saved_history, ('acc', 'val_acc'))
 
-
-# Predict
-def predict_next_words(model, tokenizer, sequence_length, seed_text, num_next_words):
-    new_text = seed_text
-    seed_seqs = tokenizer.texts_to_sequences([new_text])
-
-    reverse_word_index = {token: word for (word, token) in tokenizer.word_index.items()}
-
-    for _ in range(num_next_words):
-        seed_padded_seqs = pad_sequences(seed_seqs, maxlen=sequence_length)
-        result = model.predict(seed_padded_seqs)
-        next_token = np.argmax(result)
-        seed_seqs = np.append(seed_padded_seqs[0], next_token)[np.newaxis]
-        next_word = reverse_word_index.get(next_token)
-        if next_word:
-            new_text += ' ' + next_word
-
-    return new_text
-
-
-num_next_words = 10
-seed_text = "Help me Obi Wan Kenobi, you're my only hope"
-new_text = predict_next_words(model, tokenizer, sequence_length, seed_text, num_next_words)
-print(new_text)
+metric = 'acc'
+plot([saved_history[metric][:epoch_unit], history.history[metric]], ['old', 'new'])
 
 
 # Save Model
-model.save('model_q15_1.h5')
-
+model.save('model_q15_2.h5')
